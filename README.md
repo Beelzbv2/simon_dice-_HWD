@@ -25,3 +25,7 @@ Arreglo de cables:
 | 5           | boton rojo  |
 | 4           | boton azul  |
 | 3           | boton verde |
+
+
+Prueba de el sistema:
+https://wokwi.com/projects/476190964791579649
