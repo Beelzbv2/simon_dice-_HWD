@@ -14,3 +14,14 @@ Piezas a ocupar para este trabajo:
 1 Protoboard / Breadboard (Placa de pruebas estándar)
 varios Cables de Conexión (Jumpers macho-macho / machohembra)
 
+Arreglo de cables:
+
+| Arduino Pin | Hardware.   |
+| ----------- | ------------|
+| 11          | LED rojo    |
+| 10          | LED azul    |
+| 9           | LED verde   |
+| 8           | Buzzer      |
+| 5           | boton rojo  |
+| 4           | boton azul  |
+| 3           | boton verde |
