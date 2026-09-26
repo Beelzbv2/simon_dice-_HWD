@@ -1,0 +1,181 @@
+
+Tarea 1: Hardware Digital - Juego "Simón Dice" (3 Colores)
+Placa: Arduino UNO
+Periféricos: 3 LEDs, 3 Pulsadores y 1 Zumbador Pasivo
+
+// Frecuencias de tonos para cada botón y efectos
+#define NOTE_C4  262  // Do (Rojo)
+#define NOTE_E4  330  // Mi (Verde)
+#define NOTE_G4  392  // Sol (Azul)
+#define NOTE_A3  220  // Tono de error
+#define NOTE_C5  523  // Tono de éxito
+#define NOTE_G5  784  // Tono de éxito alto
+
+// Asignación de pines
+const uint8_t ledPins[] = {12, 11, 10};     // Índice 0: Rojo (12), 1: Verde (11), 2: Azul (10)
+const uint8_t buttonPins[] = {5, 4, 3};      // Índice 0: Rojo (5),  1: Verde (4),  2: Azul (3)
+#define SPEAKER_PIN 8                        // Pin del Zumbador / Buzzer
+
+#define MAX_GAME_LENGTH 100
+const int gameTones[] = {NOTE_C4, NOTE_E4, NOTE_G4};
+
+// Variables globales para el estado del juego
+uint8_t gameSequence[MAX_GAME_LENGTH] = {0};
+uint8_t gameIndex = 0;
+
+// Tiempo de espera para el filtro antirrebote (en milisegundos)
+const unsigned long DEBOUNCE_DELAY = 50;
+
+/**
+ * Configuración inicial del microcontrolador
+ */
+void setup() {
+  Serial.begin(9600);
+
+  // Configuración de pines E/S
+  for (byte i = 0; i < 3; i++) {
+    pinMode(ledPins[i], OUTPUT);
+    pinMode(buttonPins[i], INPUT_PULLUP); // Pull-up interno activo
+  }
+  pinMode(SPEAKER_PIN, OUTPUT);
+
+  // Inicialización de la semilla pseudoaleatoria mediante lectura de ruido en pin A0 flotante
+  randomSeed(analogRead(A0));
+
+  Serial.println("Sistema 'Simón Dice' Iniciado correctamente.");
+}
+
+/**
+ * Enciende un LED específico y reproduce su nota musical asociada
+ */
+void lightLedAndPlayTone(byte ledIndex) {
+  digitalWrite(ledPins[ledIndex], HIGH);
+  tone(SPEAKER_PIN, gameTones[ledIndex]);
+  delay(300);
+  digitalWrite(ledPins[ledIndex], LOW);
+  noTone(SPEAKER_PIN);
+}
+
+/**
+ * Reproduce la secuencia acumulada hasta el nivel actual
+ */
+void playSequence() {
+  for (int i = 0; i < gameIndex; i++) {
+    byte currentLed = gameSequence[i];
+    lightLedAndPlayTone(currentLed);
+    delay(150); // Pausa entre muestras de la secuencia
+  }
+}
+
+/**
+ * Lee la entrada de los botones aplicando técnica de filtrado antirrebote (debouncing)
+ * Retorna el índice del botón presionado (0: Rojo, 1: Verde, 2: Azul)
+ */
+byte readButtons() {
+  while (true) {
+    for (byte i = 0; i < 3; i++) {
+      byte buttonPin = buttonPins[i];
+
+      // Detección de pulsación (estado LOW por modo INPUT_PULLUP)
+      if (digitalRead(buttonPin) == LOW) {
+        delay(DEBOUNCE_DELAY); // Retardo antirrebote para filtrar ruido mecánico
+
+        // Confirmar que sigue presionado tras el filtrado
+        if (digitalRead(buttonPin) == LOW) {
+          // Esperar a que el usuario libere el botón para evitar lecturas duplicadas
+          while (digitalRead(buttonPin) == LOW) {
+            delay(10);
+          }
+          return i;
+        }
+      }
+    }
+    delay(1);
+  }
+}
+
+/**
+ * Animación sonora y visual de Game Over (Fallo de secuencia)
+ */
+void gameOver() {
+  Serial.print("¡Juego Terminado! Nivel final alcanzado: ");
+  Serial.println(gameIndex);
+
+  // Tono grave de error
+  tone(SPEAKER_PIN, NOTE_A3, 500);
+
+  // Animación: Parpadeo de TODOS los LEDs al unísono como señal visual de fallo
+  for (byte r = 0; r < 3; r++) {
+    for (byte i = 0; i < 3; i++) {
+      digitalWrite(ledPins[i], HIGH);
+    }
+    delay(200);
+    for (byte i = 0; i < 3; i++) {
+      digitalWrite(ledPins[i], LOW);
+    }
+    delay(200);
+  }
+
+  noTone(SPEAKER_PIN);
+
+  // Reiniciar estado del juego al Nivel 1
+  gameIndex = 0;
+  delay(1000);
+}
+
+/**
+ * Comprueba cada entrada del usuario contra la secuencia guardada
+ */
+bool checkUserSequence() {
+  for (int i = 0; i < gameIndex; i++) {
+    byte expectedButton = gameSequence[i];
+    byte actualButton = readButtons();
+
+    // Retroalimentación visual y sonora inmediata al presionar
+    lightLedAndPlayTone(actualButton);
+
+    // Verificación paso a paso
+    if (expectedButton != actualButton) {
+      return false; // Error detectado
+    }
+  }
+  return true; // Secuencia completada correctamente
+}
+
+/**
+ * Reproduce melodía distintiva al pasar de nivel
+ */
+void playLevelUpSound() {
+  tone(SPEAKER_PIN, NOTE_C5, 120);
+  delay(150);
+  tone(SPEAKER_PIN, NOTE_E4, 120);
+  delay(150);
+  tone(SPEAKER_PIN, NOTE_G5, 200);
+  delay(250);
+  noTone(SPEAKER_PIN);
+}
+
+/**
+ * Bucle principal de ejecución del juego
+ */
+void loop() {
+  // Genera paso aleatorio entre 0 y 2 (Rojo, Verde, Azul)
+  gameSequence[gameIndex] = random(0, 3);
+  gameIndex++;
+
+  if (gameIndex >= MAX_GAME_LENGTH) {
+    gameIndex = MAX_GAME_LENGTH - 1;
+  }
+
+  // 1. Desplegar la secuencia del nivel
+  playSequence();
+
+  // 2. Capturar y validar la respuesta del jugador
+  if (!checkUserSequence()) {
+    gameOver(); // Ejecuta fallo y reinicia
+  } else {
+    // 3. Condición de acierto: Avanza de nivel
+    playLevelUpSound();
+    delay(500);
+  }
+}
